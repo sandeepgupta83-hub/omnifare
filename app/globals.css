@@ -1,0 +1,171 @@
+@import "tailwindcss";
+@custom-variant dark (&:where(.dark, .dark *));
+@custom-variant hybrid (&:where(.hybrid, .hybrid *));
+@import "leaflet/dist/leaflet.css";
+
+:root {
+  color-scheme: light;
+  --background: #f8fafc;    /* Premium Soft Metallic Light Slate */
+  --foreground: #0f172a;    /* Dark Slate-900 */
+  --primary: #059669;       /* Emerald-600 */
+  --card-bg: rgba(255, 255, 255, 0.7);
+  --card-border: rgba(15, 23, 42, 0.06);
+  --map-tile-filter: none;
+  --glow-color: rgba(94, 90, 239, 0.1);
+}
+
+.dark {
+  color-scheme: dark;
+  --background: #080616;    /* Deep Violet-Navy from original Vercel prototype */
+  --foreground: #f8fafc;    /* Soft White-Slate */
+  --primary: #10b981;       /* Vivid Emerald-500 */
+  --card-bg: rgba(13, 11, 28, 0.45);
+  --card-border: rgba(255, 255, 255, 0.05);
+  --map-tile-filter: invert(100%) hue-rotate(180deg) brightness(95%) contrast(90%);
+  --glow-color: rgba(94, 90, 239, 0.25);
+}
+
+.hybrid {
+  color-scheme: light;
+  --background: #f1f5f9;    /* Clean Premium Metallic Light Slate background */
+  --foreground: #0f172a;    /* Dark Slate text */
+  --primary: #5e5aef;       /* Premium Custom Indigo */
+  --card-bg: rgba(255, 255, 255, 0.85); /* Highly readable white glass panels */
+  --card-border: rgba(15, 23, 42, 0.08);
+  --map-tile-filter: none;  /* Light map tiles */
+  --glow-color: rgba(94, 90, 239, 0.15);
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: 'Inter', sans-serif;
+  overflow-x: hidden;
+  transition: background-color 0.3s ease, color 0.3s ease;
+}
+
+/* Dynamic Font Heading styles */
+.font-sora {
+  font-family: var(--font-sora), 'Sora', sans-serif;
+}
+
+.font-sans {
+  font-family: var(--font-inter), 'Inter', sans-serif;
+}
+
+/* Elegant Premium Scrollbars */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: rgba(15, 23, 42, 0.02);
+}
+
+.dark ::-webkit-scrollbar-track {
+  background: #05030f;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(15, 23, 42, 0.15);
+  border-radius: 8px;
+}
+
+.dark ::-webkit-scrollbar-thumb {
+  background: #191632;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--primary);
+}
+
+/* Glassmorphism custom classes */
+.glass-panel {
+  background: var(--card-bg);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid var(--card-border);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.glass-panel-hover:hover {
+  background: rgba(255, 255, 255, 0.85);
+  border-color: rgba(94, 90, 239, 0.2);
+  box-shadow: 0 10px 30px rgba(94, 90, 239, 0.04);
+}
+
+.dark .glass-panel-hover:hover {
+  background: rgba(13, 11, 28, 0.6);
+  border-color: rgba(94, 90, 239, 0.3);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4);
+}
+
+/* Premium gradient button */
+.btn-premium-gradient {
+  background: linear-gradient(135deg, #5e5aef 0%, #10b981 100%);
+  box-shadow: 0 4px 20px var(--glow-color);
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.btn-premium-gradient:hover {
+  box-shadow: 0 6px 25px rgba(94, 90, 239, 0.35);
+  transform: translateY(-1px);
+}
+
+.btn-premium-gradient:active {
+  transform: translateY(0);
+}
+
+/* Metallic glowing buttons */
+.btn-emerald-glow {
+  background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+  box-shadow: 0 4px 15px rgba(16, 185, 129, 0.25);
+  transition: all 0.2s ease-in-out;
+}
+
+.btn-emerald-glow:hover {
+  box-shadow: 0 6px 20px rgba(16, 185, 129, 0.4);
+  transform: translateY(-1.5px);
+}
+
+/* Leaflet dark-map tiles config */
+.dark-map-tiles {
+  filter: var(--map-tile-filter);
+}
+
+/* Shimmer animations for pricing updates */
+@keyframes shimmer {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+.shimmer {
+  background: linear-gradient(90deg, rgba(15, 23, 42, 0.05) 25%, rgba(15, 23, 42, 0.1) 50%, rgba(15, 23, 42, 0.05) 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.5s infinite;
+}
+
+.dark .shimmer {
+  background: linear-gradient(90deg, #090d16 25%, #191632 50%, #090d16 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.5s infinite;
+}
+
+/* Custom categories scrollbar reset */
+.scrollbar-none::-webkit-scrollbar {
+  display: none;
+}
+.scrollbar-none {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}

@@ -1,0 +1,24 @@
+{
+  "name": "OmniFare | Premium Ride Aggregator",
+  "short_name": "OmniFare",
+  "description": "Real-time side-by-side fare comparisons across multiple ride services.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#080616",
+  "theme_color": "#10b981",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "/file.svg",
+      "sizes": "192x192",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/file.svg",
+      "sizes": "512x512",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
