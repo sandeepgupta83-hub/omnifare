@@ -1,23 +1,21 @@
 import { NextResponse } from 'next/server';
-const { chromium } = require('playwright-core');
+import { chromium } from 'playwright-core'; // Clean ES import to fix the runtime module error
 
-export async function GET(request: Request) {
-  const { searchParams } = new URL(request.url);
-  const startLat = searchParams.get('startLat');
-  const startLng = searchParams.get('startLng');
-  const endLat = searchParams.get('endLat');
-  const endLng = searchParams.get('endLng');
-
-  if (!startLat || !endLat) {
-    return NextResponse.json({ error: "Missing coordinates" }, { status: 400 });
-  }
-
-  const token = process.env.BROWSERLESS_TOKEN;
-  const wsEndpoint = `wss://chrome.browserless.io?token=${token}`;
-  
+export async function POST(request: Request) {
   let browser;
   try {
-    // Connect to your free Browserless cloud browser instance
+    // 1. Read the parameters out of the incoming POST request body
+    const body = await request.json();
+    const { startLat, startLng, endLat, endLng } = body;
+
+    if (!startLat || !endLat) {
+      return NextResponse.json({ error: "Missing coordinates in request body" }, { status: 400 });
+    }
+
+    const token = process.env.BROWSERLESS_TOKEN;
+    const wsEndpoint = `wss://chrome.browserless.io?token=${token}`;
+    
+    // 2. Connect to Browserless over WebSockets
     browser = await chromium.connectOverCDP(wsEndpoint);
     const context = await browser.newContext({
       viewport: { width: 375, height: 812 },
@@ -26,14 +24,14 @@ export async function GET(request: Request) {
     
     const page = await context.newPage();
 
-    // Open Uber's public mobile web application interface with user coordinates
+    // 3. Navigate to the target web booker layout using your live coordinates
     const targetUrl = `https://m.uber.com/looking?pickup={"latitude":${startLat},"longitude":${startLng}}&destination={"latitude":${endLat},"longitude":${endLng}}`;
     await page.goto(targetUrl, { waitUntil: 'networkidle' });
 
-    // Wait for the UI components to calculate and display the live options
+    // 4. Wait for the live pricing elements to finish calculating
     await page.waitForSelector('[data-test="fare-card"]', { timeout: 8000 });
 
-    // Extract the live, real-world text content straight out of the DOM nodes
+    // 5. Parse out titles and fare data nodes safely
     const fareOptions = await page.evaluate(() => {
       const cards = document.querySelectorAll('[data-test="fare-card"]');
       return Array.from(cards).map(card => {
@@ -46,7 +44,7 @@ export async function GET(request: Request) {
     return NextResponse.json({ success: true, data: fareOptions });
 
   } catch (error: any) {
-    console.error("Scraping error snapshot:", error);
+    console.error("Scraping execution caught an error:", error);
     return NextResponse.json({ success: false, error: error.message }, { status: 500 });
   } finally {
     if (browser) await browser.close();
