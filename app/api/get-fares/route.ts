@@ -1,166 +1,163 @@
 import { NextResponse } from "next/server";
 
-// Using a broad interface to avoid strict indexing errors during build
-interface FareOption {
-  id: string;
-  name: string;
-  provider: string;
-  category: string;
-  price: number;
-  durationMinutes: number;
-  etaMinutes: number;
-  deeplink: string;
-  discountApplied?: string | null;
-}
-
-// Market multipliers for smart estimation
-// Typed with index signature to allow dynamic string lookup
-const MARKET_OFFSETS: { [key: string]: { [key: string]: number } } = {
-  Ola: { Auto: 1.02, Bike: 1.05, EcoCab: 0.98, PremiumSedan: 1.05, SUV: 1.03 },
-  Rapido: { Auto: 0.95, Bike: 0.88 },
-  NammaYatri: { Auto: 0.85, EcoCab: 0.82 },
+// 1. Mumbai RTO Standard Rate Card (Fallback Baseline)
+// These are used for Ola/Rapido/ONDC calculation if Uber API is down.
+const MUMBAI_RTO_BASE: { [key: string]: any } = {
+  Auto: { baseFare: 23, baseKm: 1.5, perKm: 15.33, perMin: 1.0 },
+  Bike: { baseFare: 20, baseKm: 2.0, perKm: 8.0, perMin: 0.5 },
+  EcoCab: { baseFare: 28, baseKm: 1.5, perKm: 18.67, perMin: 1.5 },
+  PremiumSedan: { baseFare: 100, baseKm: 4.0, perKm: 22.0, perMin: 2.0 },
+  SUV: { baseFare: 150, baseKm: 4.0, perKm: 28.0, perMin: 2.5 },
 };
 
-// Fallback pricing configuration
-const TARIFFS: { [key: string]: any } = {
-  Auto: { base: 30, km: 15, min: 1 },
-  Bike: { base: 20, km: 8, min: 0.5 },
-  EcoCab: { base: 60, km: 18, min: 1.5 },
-  PremiumSedan: { base: 100, km: 22, min: 2 },
-  SUV: { base: 150, km: 28, min: 2.5 },
+// 2. Market Multipliers (Relative to the Anchor)
+const MARKET_OFFSETS: { [key: string]: { [key: string]: number } } = {
+  Ola: { Auto: 1.05, Bike: 1.1, EcoCab: 1.02, PremiumSedan: 1.05, SUV: 1.05 },
+  Rapido: { Auto: 0.98, Bike: 0.92 },
+  NammaYatri: { Auto: 0.88, EcoCab: 0.85 }, // No commission baseline
 };
 
 export async function POST(request: Request) {
   try {
-    const body: any = await request.json();
-    const { pickup_lat, pickup_lng, drop_lat, drop_lng } = body;
+    const { pickup_lat, pickup_lng, drop_lat, drop_lng } = (await request.json()) as any;
 
-    // 1. Get Distance Metadata (OSRM)
-    let distanceMeters = 5000;
-    let durationSeconds = 900;
-
+    // A. GET ROUTE METADATA (OSRM)
+    let distanceMeters = 0;
+    let durationSeconds = 0;
     try {
       const osrmRes = await fetch(
         `https://router.project-osrm.org/route/v1/driving/${pickup_lng},${pickup_lat};${drop_lng},${drop_lat}?overview=false`
       );
-      const osrmData: any = await osrmRes.json();
-      if (osrmData.routes?.[0]) {
-        distanceMeters = osrmData.routes[0].distance;
-        durationSeconds = osrmData.routes[0].duration;
-      }
+      const osrmData = (await osrmRes.json()) as any;
+      distanceMeters = osrmData.routes?.[0]?.distance || 0;
+      durationSeconds = osrmData.routes?.[0]?.duration || 0;
     } catch (e) {
-      console.warn("OSRM Route fallback used");
+      console.error("Routing error");
     }
 
-    // 2. Uber Live Fetch (The Anchor)
-    const anchorPrices: { [key: string]: number } = {};
-    const finalOptions: FareOption[] = [];
+    // B. STRICT UBER LIVE FETCH
+    const uberAnchorPrices: { [key: string]: number } = {};
+    const uberOptions: any[] = [];
     const uberToken = process.env.UBER_SERVER_TOKEN;
 
     if (uberToken) {
       try {
-        const uberUrl = `https://api.uber.com/v1.2/estimates/price?start_latitude=${pickup_lat}&start_longitude=${pickup_lng}&end_latitude=${drop_lat}&end_longitude=${drop_lng}`;
-        const uberRes = await fetch(uberUrl, {
-          headers: { Authorization: `Token ${uberToken}` },
-        });
-        const uberData: any = await uberRes.json();
+        // Strict 5-second timeout for Uber API
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 5000);
 
-        if (uberData.prices) {
-          uberData.prices.forEach((item: any) => {
+        const uberRes = await fetch(
+          `https://api.uber.com/v1.2/estimates/price?start_latitude=${pickup_lat}&start_longitude=${pickup_lng}&end_latitude=${drop_lat}&end_longitude=${drop_lng}`,
+          { 
+            headers: { Authorization: `Token ${uberToken}` },
+            signal: controller.signal 
+          }
+        );
+        clearTimeout(timeoutId);
+
+        if (uberRes.ok) {
+          const uberData = (await uberRes.json()) as any;
+          (uberData.prices || []).forEach((item: any) => {
             let cat = "EcoCab";
             const name = item.display_name.toLowerCase();
             if (name.includes("auto")) cat = "Auto";
             else if (name.includes("moto") || name.includes("bike")) cat = "Bike";
             else if (name.includes("premier")) cat = "PremiumSedan";
-            else if (name.includes("xl") || name.includes("suv")) cat = "SUV";
+            else if (name.includes("xl")) cat = "SUV";
 
-            const price = Math.round((item.high_estimate + item.low_estimate) / 2);
-            anchorPrices[cat] = price;
+            const avgPrice = Math.round((item.high_estimate + item.low_estimate) / 2);
+            
+            // Store for anchor use
+            if (!uberAnchorPrices[cat] || avgPrice < uberAnchorPrices[cat]) {
+              uberAnchorPrices[cat] = avgPrice;
+            }
 
-            finalOptions.push({
-              id: `uber-${item.product_id || Math.random()}`,
+            uberOptions.push({
+              id: `uber-${item.product_id}`,
               name: item.display_name,
               provider: "Uber",
               category: cat,
-              price: price,
-              durationMinutes: Math.round(item.duration / 60) || Math.round(durationSeconds / 60),
+              price: avgPrice,
+              durationMinutes: Math.round(item.duration / 60),
               etaMinutes: 4,
-              deeplink: `uber://?action=setPickup&pickup[latitude]=${pickup_lat}&pickup[longitude]=${pickup_lng}&dropoff[latitude]=${drop_lat}&dropoff[longitude]=${drop_lng}`,
+              deeplink: `uber://?action=setPickup&pickup[latitude]=${pickup_lat}&pickup[longitude]=${pickup_lng}`,
             });
           });
         }
       } catch (err) {
-        console.error("Uber API production error:", err);
+        // STRICT ERROR HANDLING: If Uber fails, uberOptions remains empty.
+        // We do NOT populate fake Uber data here.
+        console.error("Uber Live API failed or timed out. Omiting Uber results.");
       }
     }
 
-    // 3. Smart Estimation for non-API providers
+    // C. DYNAMIC ESTIMATION FOR OTHERS
+    const othersOptions: any[] = [];
     const categories = ["Auto", "Bike", "EcoCab", "PremiumSedan", "SUV"];
     const providers = ["Ola", "Rapido", "NammaYatri"];
 
     categories.forEach((cat) => {
-      // Establish the base price for this category
-      let basePrice = anchorPrices[cat];
+      // Logic: Use Uber Live as anchor, or fallback to Mumbai RTO math
+      let basePrice = uberAnchorPrices[cat];
 
       if (!basePrice) {
-        const t = TARIFFS[cat] || TARIFFS.EcoCab;
-        basePrice = t.base + (distanceMeters / 1000) * t.km + (durationSeconds / 60) * t.min;
-        // Apply random organic flux (1.0 to 1.2)
-        basePrice = basePrice * (1 + Math.random() * 0.2);
+        const rto = MUMBAI_RTO_BASE[cat] || MUMBAI_RTO_BASE.EcoCab;
+        const distKm = distanceMeters / 1000;
+        const timeMin = durationSeconds / 60;
+        
+        basePrice = rto.baseFare;
+        if (distKm > rto.baseKm) {
+          basePrice += (distKm - rto.baseKm) * rto.perKm;
+        }
+        basePrice += timeMin * rto.perMin;
+        
+        // Add a slight random variance to make "estimates" feel live
+        basePrice = basePrice * (0.95 + Math.random() * 0.1);
       }
 
-      // Estimate for each provider based on their relative market position
       providers.forEach((prov) => {
         const multiplier = MARKET_OFFSETS[prov]?.[cat];
         if (multiplier) {
           const isONDC = prov === "NammaYatri";
-          finalOptions.push({
+          othersOptions.push({
             id: `${prov.toLowerCase()}-${cat.toLowerCase()}`,
             name: isONDC && cat === "Auto" ? "Namma Yatri" : `${prov} ${cat}`,
             provider: isONDC ? "ONDC" : prov,
             category: cat,
             price: Math.round(basePrice * multiplier),
             durationMinutes: Math.round(durationSeconds / 60),
-            etaMinutes: Math.floor(Math.random() * 5) + 2,
+            etaMinutes: Math.floor(Math.random() * 4) + 3,
             deeplink: isONDC ? "https://nammayatri.in" : "#",
-            discountApplied: isONDC ? "Zero Commission Pricing" : null,
           });
         }
       });
     });
 
-    // 4. Group and Return
-    const faresByCat: { [key: string]: FareOption[] } = {
-      Auto: [],
-      Bike: [],
-      EcoCab: [],
-      PremiumSedan: [],
-      SUV: [],
+    // D. AGGREGATE & GROUP
+    const allFares = [...uberOptions, ...othersOptions];
+    const faresByGroup: { [key: string]: any[] } = {
+      Auto: [], Bike: [], EcoCab: [], PremiumSedan: [], SUV: []
     };
 
-    finalOptions.forEach((option) => {
-      if (faresByCat[option.category]) {
-        faresByCat[option.category].push(option);
-      }
+    allFares.forEach((f) => {
+      if (faresByGroup[f.category]) faresByGroup[f.category].push(f);
     });
 
-    // Sort each group by price
-    Object.keys(faresByCat).forEach((key) => {
-      faresByCat[key].sort((a, b) => a.price - b.price);
+    // Sort each category by price
+    Object.keys(faresByGroup).forEach(k => {
+      faresByGroup[k].sort((a, b) => a.price - b.price);
     });
 
     return NextResponse.json({
       metadata: {
         distanceKm: (distanceMeters / 1000).toFixed(1),
-        durationMin: Math.round(durationSeconds / 60),
-        uberLive: Object.keys(anchorPrices).length > 0,
+        uberStatus: uberOptions.length > 0 ? "LIVE" : "UNAVAILABLE",
+        source: uberOptions.length > 0 ? "Uber Anchor" : "Mumbai RTO Baseline"
       },
-      fares: faresByCat,
+      fares: faresByGroup
     });
+
   } catch (error: any) {
-    return NextResponse.json(
-      { error: "Internal Server Error", details: error.message },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }
