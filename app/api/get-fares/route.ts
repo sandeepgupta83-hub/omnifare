@@ -1,10 +1,7 @@
 import { NextResponse } from 'next/server';
-import { chromium } from 'playwright-core'; // Clean ES import to fix the runtime module error
 
 export async function POST(request: Request) {
-  let browser;
   try {
-    // 1. Read the parameters out of the incoming POST request body
     const body = await request.json();
     const { startLat, startLng, endLat, endLng } = body;
 
@@ -13,40 +10,60 @@ export async function POST(request: Request) {
     }
 
     const token = process.env.BROWSERLESS_TOKEN;
-    const wsEndpoint = `wss://chrome.browserless.io?token=${token}`;
     
-    // 2. Connect to Browserless over WebSockets
-    browser = await chromium.connectOverCDP(wsEndpoint);
-    const context = await browser.newContext({
-      viewport: { width: 375, height: 812 },
-      userAgent: 'Mozilla/5.0 (iPhone; CPU iPhone OS 16_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.0 Mobile/15E148 Safari/604.1'
-    });
-    
-    const page = await context.newPage();
+    // This entire browser automation runs directly inside the Browserless cloud.
+    // Zero dependencies or heavy browser packages are needed on your Vercel server!
+    const cloudScraperScript = `
+      export default async ({ page, context }) => {
+        const { targetUrl } = context;
+        
+        // Emulate a standard mobile screen layout
+        await page.setUserAgent('Mozilla/5.0 (iPhone; CPU iPhone OS 16_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.0 Mobile/15E148 Safari/604.1');
+        await page.setViewport({ width: 375, height: 812 });
+        
+        // Navigate to the mobile map page 
+        await page.goto(targetUrl, { waitUntil: 'networkidle2' });
+        
+        // Wait for the pricing calculation component cards to render
+        await page.waitForSelector('[data-test="fare-card"]', { timeout: 8000 });
+        
+        // Extract plain layout titles and fare nodes straight from the page DOM
+        const options = await page.$$eval('[data-test="fare-card"]', cards => {
+          return cards.map(card => {
+            const title = card.querySelector('[data-test="fare-title"]')?.textContent || 'Ride';
+            const price = card.querySelector('[data-test="fare-price"]')?.textContent || 'N/A';
+            return { provider: 'Uber', tier: title, fare: price };
+          });
+        });
+        
+        return { data: options, type: 'application/json' };
+      };
+    `;
 
-    // 3. Navigate to the target web booker layout using your live coordinates
     const targetUrl = `https://m.uber.com/looking?pickup={"latitude":${startLat},"longitude":${startLng}}&destination={"latitude":${endLat},"longitude":${endLng}}`;
-    await page.goto(targetUrl, { waitUntil: 'networkidle' });
 
-    // 4. Wait for the live pricing elements to finish calculating
-    await page.waitForSelector('[data-test="fare-card"]', { timeout: 8000 });
-
-    // 5. Parse out titles and fare data nodes safely
-    const fareOptions = await page.evaluate(() => {
-      const cards = document.querySelectorAll('[data-test="fare-card"]');
-      return Array.from(cards).map(card => {
-        const title = card.querySelector('[data-test="fare-title"]')?.textContent || 'Ride';
-        const price = card.querySelector('[data-test="fare-price"]')?.textContent || 'N/A';
-        return { provider: 'Uber', tier: title, fare: price };
-      });
+    // Make a standard, lightweight HTTP POST call to Browserless
+    const response = await fetch(`https://chrome.browserless.io/function?token=${token}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        code: cloudScraperScript,
+        context: { targetUrl }
+      })
     });
 
-    return NextResponse.json({ success: true, data: fareOptions });
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`Browserless service error: ${errorText}`);
+    }
+
+    const scrapedData = await response.json();
+    
+    // Return the clean live options back to your app front-end layout dashboard
+    return NextResponse.json({ success: true, data: scrapedData });
 
   } catch (error: any) {
-    console.error("Scraping execution caught an error:", error);
+    console.error("Aggregation endpoint failed:", error);
     return NextResponse.json({ success: false, error: error.message }, { status: 500 });
-  } finally {
-    if (browser) await browser.close();
   }
 }
