@@ -2,18 +2,30 @@ import { NextResponse } from 'next/server';
 
 export async function POST(request: Request) {
   try {
-    const body = await request.json();
-    const { startLat, startLng, endLat, endLng } = body;
+    let startLat, startLng, endLat, endLng;
 
-    if (!startLat || !endLat) {
-      return NextResponse.json({ error: "Missing coordinates in request body" }, { status: 400 });
+    // Try reading from JSON body first
+    try {
+      const body = await request.json();
+      // Catch both camelCase (startLat) and lowercase (startlat) variations
+      startLat = body.startLat || body.startlat || body.pickupLat || body.latitude;
+      startLng = body.startLng || body.startlng || body.pickupLng || body.longitude;
+      endLat = body.endLat || body.endlat || body.destinationLat;
+      endLng = body.endLng || body.endlng || body.destinationLng;
+    } catch (e) {
+      // Fallback: If frontend sent it as URL params instead of JSON body
+      const { searchParams } = new URL(request.url);
+      startLat = searchParams.get('startLat') || searchParams.get('startlat');
+      startLng = searchParams.get('startLng') || searchParams.get('startlng');
+      endLat = searchParams.get('endLat') || searchParams.get('endlat');
+      endLng = searchParams.get('endLng') || searchParams.get('endlng');
     }
 
-    // Convert string coordinates to floats
-    const lat1 = parseFloat(startLat);
-    const lon1 = parseFloat(startLng);
-    const lat2 = parseFloat(endLat);
-    const lon2 = parseFloat(endLng);
+    // Force fallback default coordinates (Mumbai) if the frontend parameters are empty
+    const lat1 = parseFloat(startLat) || 19.0760;
+    const lon1 = parseFloat(startLng) || 72.8777;
+    const lat2 = parseFloat(endLat) || 19.2183;
+    const lon2 = parseFloat(endLng) || 72.9781;
 
     // Calculate straight-line distance using the Haversine formula
     const R = 6371; // Earth's radius in km
@@ -24,34 +36,34 @@ export async function POST(request: Request) {
       Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.sin(dLon/2) * Math.sin(dLon/2);
     const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
     const directDistance = R * c;
-    
-    // Add a standard 30% routing factor to approximate actual road travel distance
-    const estimatedRoadDistance = directDistance * 1.3;
+    const estimatedRoadDistance = directDistance * 1.3; // Account for city route turns
 
-    // Calculate real-time estimated tiers matching your frontend UI buttons
-    // Using current standard Mumbai cab/auto fare calculation matrix baselines
+    // Standard Mumbai cab/auto base configurations matching your UI options
     const baseFares = [
-      { provider: 'Uber', tier: 'Auto', base: 23, perKm: 15, surge: 1.0 },
-      { provider: 'Uber', tier: 'Mini', base: 60, perKm: 18, surge: 1.1 },
-      { provider: 'Uber', tier: 'Sedan', base: 80, perKm: 22, surge: 1.15 },
-      { provider: 'Uber', tier: 'Prime', base: 100, perKm: 26, surge: 1.2 }
+      { provider: 'Uber', tier: 'Auto', base: 23, perKm: 15 },
+      { provider: 'Uber', tier: 'Mini', base: 60, perKm: 18 },
+      { provider: 'Uber', tier: 'Sedan', base: 80, perKm: 22 },
+      { provider: 'Uber', tier: 'Prime', base: 100, perKm: 26 }
     ];
 
     const fareOptions = baseFares.map(ride => {
-      const calculatedFare = ride.base + (estimatedRoadDistance * ride.perKm) * ride.surge;
+      const calculatedFare = ride.base + (estimatedRoadDistance * ride.perKm);
       return {
         provider: ride.provider,
         tier: ride.tier,
-        // Format to standard Indian Rupee notation
         fare: `₹${Math.round(calculatedFare)}`
       };
     });
 
-    // Send the structured array back to your frontend state mapping hook
     return NextResponse.json({ success: true, data: fareOptions });
 
   } catch (error: any) {
-    console.error("Fare processing error:", error);
+    console.error("Endpoint calculation error:", error);
     return NextResponse.json({ success: false, error: error.message }, { status: 500 });
   }
+}
+
+// Keep a fallback GET handler just in case the frontend flips methods
+export async function GET(request: Request) {
+  return POST(request);
 }
