@@ -1,8 +1,8 @@
-"use client"; // Required for useState and async functions
+"use client";
 
 import { useState } from "react";
 
-// Define the shape of your suggestion data
+// 1. Define the type at the top
 interface AutocompleteResult {
   display_name?: string;
   is_google?: boolean;
@@ -12,18 +12,21 @@ interface AutocompleteResult {
 }
 
 export default function ComparePage() {
-  // 1. Declare your states (you likely have these defined elsewhere)
+  // 2. Define the states that the function uses
   const [isSearching, setIsSearching] = useState(false);
   const [pickupText, setPickupText] = useState("");
   const [dropText, setDropText] = useState("");
-  // Add other states (setPickupCoords, setPickupSuggestions, etc.) here
+  const [pickupCoords, setPickupCoords] = useState({ lat: 0, lng: 0 });
+  const [dropCoords, setDropCoords] = useState({ lat: 0, lng: 0 });
+  const [pickupSuggestions, setPickupSuggestions] = useState<AutocompleteResult[]>([]);
+  const [dropSuggestions, setDropSuggestions] = useState<AutocompleteResult[]>([]);
+  const [activeInput, setActiveInput] = useState<"pickup" | "drop" | null>(null);
 
-  // 2. Your function
+  // 3. Your logic inside the component
   const handleSelectSuggestion = async (item: AutocompleteResult, type: "pickup" | "drop") => {
     setIsSearching(true);
     try {
       let coords = { lat: 0, lng: 0 };
-      
       const rawDisplayName = item.display_name || "Unknown Location";
       let shortName = typeof rawDisplayName === 'string' 
         ? rawDisplayName.split(",").slice(0, 3).join(",") 
@@ -49,22 +52,26 @@ export default function ComparePage() {
 
       if (type === "pickup") {
         setPickupText(shortName);
-        // Ensure you have these setter functions defined
+        setPickupCoords(coords);
+        setPickupSuggestions([]);
       } else {
         setDropText(shortName);
+        setDropCoords(coords);
+        setDropSuggestions([]);
       }
     } catch (err) {
       console.error("Failed to select address suggestion", err);
     } finally {
       setIsSearching(false);
+      setActiveInput(null);
     }
   };
 
-  // 3. Mandatory return (JSX)
+  // 4. Return the UI
   return (
-    <main>
+    <div style={{ padding: '20px' }}>
       <h1>Compare Fares</h1>
-      {/* Your existing UI logic goes here */}
-    </main>
+      <p>Select your location to get started.</p>
+    </div>
   );
 }
