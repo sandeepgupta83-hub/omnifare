@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import React, { useState, useEffect } from "react";
 
 interface AutocompleteResult {
   display_name?: string;
@@ -43,7 +43,9 @@ export default function ComparePage() {
         const res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(debouncedPickup)}`);
         if (!res.ok) throw new Error("API Limit reached");
         const data = await res.json();
-        setPickupSuggestions(data);
+        if (Array.isArray(data)) {
+          setPickupSuggestions(data);
+        }
       } catch (error) {
         console.error("Handled pickup fetch gracefully:", error);
       }
@@ -61,7 +63,9 @@ export default function ComparePage() {
         const res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(debouncedDrop)}`);
         if (!res.ok) throw new Error("API Limit reached");
         const data = await res.json();
-        setDropSuggestions(data);
+        if (Array.isArray(data)) {
+          setDropSuggestions(data);
+        }
       } catch (error) {
         console.error("Handled drop fetch gracefully:", error);
       }
@@ -99,7 +103,7 @@ export default function ComparePage() {
           <div className="bg-slate-100 px-3 py-1.5 rounded-full text-xs font-bold text-slate-600 border border-slate-200">
             ₹0 <span className="text-slate-400 font-medium ml-1">SAVED • 0 RIDES</span>
           </div>
-          <button className="bg-emerald-50 text-emerald-600 border border-emerald-200 font-bold px-4 py-2 rounded-xl text-xs hover:bg-emerald-100 transition shadow-sm">
+          <button type="button" className="bg-emerald-50 text-emerald-600 border border-emerald-200 font-bold px-4 py-2 rounded-xl text-xs hover:bg-emerald-100 transition shadow-sm">
             SIGN IN / SIGN UP
           </button>
         </div>
@@ -124,7 +128,7 @@ export default function ComparePage() {
                 <p className="text-[11px] text-slate-500 mt-0.5 max-w-[240px]">Sign In to link your Uber VIP and Ola Select tiers for live custom prices!</p>
               </div>
             </div>
-            <button className="bg-indigo-600 text-white text-[11px] font-bold px-3 py-2 rounded-xl hover:bg-indigo-700 transition shadow-sm whitespace-nowrap">
+            <button type="button" className="bg-indigo-600 text-white text-[11px] font-bold px-3 py-2 rounded-xl hover:bg-indigo-700 transition shadow-sm whitespace-nowrap">
               SIGN IN / SIGN UP
             </button>
           </div>
@@ -143,7 +147,7 @@ export default function ComparePage() {
                   onChange={(e) => setPickupText(e.target.value)}
                   onFocus={() => setActiveInput("pickup")}
                   placeholder="Enter Pickup Location..."
-                  className="w-100 pl-11 pr-4 py-3.5 bg-slate-50 hover:bg-slate-100/70 focus:bg-white border border-slate-200/80 rounded-xl text-sm font-medium transition focus:outline-none focus:ring-2 focus:ring-indigo-500/20 w-full"
+                  className="pl-11 pr-4 py-3.5 bg-slate-50 hover:bg-slate-100/70 focus:bg-white border border-slate-200/80 rounded-xl text-sm font-medium transition focus:outline-none focus:ring-2 focus:ring-indigo-500/20 w-full"
                 />
                 {activeInput === "pickup" && pickupSuggestions.length > 0 && (
                   <ul className="absolute left-0 right-0 top-full mt-2 bg-white border border-slate-200 rounded-xl shadow-xl max-h-48 overflow-y-auto z-50 divide-y divide-slate-50">
@@ -157,7 +161,7 @@ export default function ComparePage() {
               </div>
 
               {/* Reverse Locations Button */}
-              <button className="absolute right-4 top-1/2 -translate-y-1/2 bg-white border border-slate-200 hover:border-slate-300 shadow-sm w-7 h-7 rounded-full flex items-center justify-center text-slate-500 z-20 transition active:scale-95 text-xs font-bold">
+              <button type="button" className="absolute right-4 top-1/2 -translate-y-1/2 bg-white border border-slate-200 hover:border-slate-300 shadow-sm w-7 h-7 rounded-full flex items-center justify-center text-slate-500 z-20 transition active:scale-95 text-xs font-bold">
                 ⇅
               </button>
 
@@ -170,7 +174,7 @@ export default function ComparePage() {
                   onChange={(e) => setDropText(e.target.value)}
                   onFocus={() => setActiveInput("drop")}
                   placeholder="Where to? (Enter Drop Location...)"
-                  className="w-100 pl-11 pr-4 py-3.5 bg-slate-50 hover:bg-slate-100/70 focus:bg-white border border-slate-200/80 rounded-xl text-sm font-medium transition focus:outline-none focus:ring-2 focus:ring-indigo-500/20 w-full"
+                  className="pl-11 pr-4 py-3.5 bg-slate-50 hover:bg-slate-100/70 focus:bg-white border border-slate-200/80 rounded-xl text-sm font-medium transition focus:outline-none focus:ring-2 focus:ring-indigo-500/20 w-full"
                 />
                 {activeInput === "drop" && dropSuggestions.length > 0 && (
                   <ul className="absolute left-0 right-0 top-full mt-2 bg-white border border-slate-200 rounded-xl shadow-xl max-h-48 overflow-y-auto z-50 divide-y divide-slate-50">
@@ -189,6 +193,7 @@ export default function ComparePage() {
               {["Bike", "Auto", "Mini", "Sedan", "Prime"].map((v) => (
                 <button
                   key={v}
+                  type="button"
                   onClick={() => setSelectedVehicle(v)}
                   className={`px-4 py-2 rounded-xl text-xs font-bold tracking-wide transition shadow-sm border ${
                     selectedVehicle === v
@@ -203,6 +208,7 @@ export default function ComparePage() {
 
             {/* Core Action Button */}
             <button
+              type="button"
               disabled={isSearching}
               className="w-full py-4 rounded-2xl font-bold text-sm text-white tracking-wide shadow-lg shadow-emerald-500/20 transition duration-200 active:scale-[0.99] bg-gradient-to-r from-emerald-400 to-teal-500 hover:from-emerald-500 hover:to-teal-600"
             >
@@ -234,7 +240,6 @@ export default function ComparePage() {
         {/* Right Viewport (Map Frame Component) */}
         <section className="lg:col-span-7 h-[600px] lg:h-[640px] sticky top-10">
           <div className="w-full h-full bg-slate-100 border-2 border-slate-200/60 rounded-3xl p-1 shadow-inner relative overflow-hidden flex items-center justify-center group">
-            {/* Fallback styling block acting as real map module box */}
             <div className="absolute inset-0 bg-gradient-to-br from-slate-50 to-slate-100 flex items-center justify-center">
               <div className="text-center space-y-2 opacity-40 group-hover:opacity-60 transition">
                 <div className="text-4xl">🗺️</div>
