@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import puppeteer from 'puppeteer-core';
 
-// === Your original tariff rules ===
+// === Tariff Rules (your original estimates) ===
 interface TariffConfig {
   baseFare: number;
   baseDistanceMeters: number;
@@ -56,32 +56,42 @@ async function scrapeUberFares(pickupAddress: string, dropAddress: string) {
     await page.goto('https://m.uber.com/looking', { waitUntil: 'networkidle2' });
 
     // Pickup
-    await page.waitForSelector('input[placeholder*="Where to?" i]', { timeout: 15000 });
+    await page.waitForSelector('input[placeholder*="Where to?" i]', { timeout: 20000 });
     await page.type('input[placeholder*="Where to?" i]', pickupAddress);
-    await new Promise(r => setTimeout(r, 1500));
-    await page.keyboard.press('Enter');
-
-    // Dropoff
-    await page.waitForSelector('input[placeholder*="drop" i]', { timeout: 10000 });
-    await page.type('input[placeholder*="drop" i]', dropAddress);
     await new Promise(r => setTimeout(r, 2000));
     await page.keyboard.press('Enter');
 
+    // Dropoff
+    await page.waitForSelector('input[placeholder*="drop" i]', { timeout: 15000 });
+    await page.type('input[placeholder*="drop" i]', dropAddress);
+    await new Promise(r => setTimeout(r, 2500));
+    await page.keyboard.press('Enter');
+
     // Wait for fares
-    await page.waitForSelector('[data-testid*="fare"], .ride-option', { timeout: 25000 });
+    await page.waitForSelector('[data-testid*="fare"], .ride-option, [class*="price"]', { timeout: 30000 });
 
     const fares = await page.evaluate(() => {
-      return Array.from(document.querySelectorAll('.ride-option, [data-testid*="ride-type"], [class*="fare-card"]')).map(el => ({
-        name: el.querySelector('.display-name, .vehicle-name, h3, [class*="name"]')?.innerText?.trim() || 'Uber Ride',
-        price: parseInt(el.querySelector('.price-amount, .fare, [class*="price"]')?.innerText?.replace(/[^0-9]/g, '') || '0'),
-        provider: "Uber (Live)",
-      })).filter(f => f.price > 50);
+      const items = Array.from(document.querySelectorAll('.ride-option, [data-testid*="ride-type"], [class*="fare"]'));
+      return items.map(el => {
+        const nameEl = el.querySelector('.display-name, .vehicle-name, h3, [class*="name"]');
+        const priceEl = el.querySelector('.price-amount, .fare, [class*="price"]');
+        
+        const name = nameEl ? (nameEl.textContent || nameEl.innerText || '').trim() : 'Uber Ride';
+        let priceText = priceEl ? (priceEl.textContent || priceEl.innerText || '0') : '0';
+        const price = parseInt(priceText.replace(/[^0-9]/g, '')) || 0;
+
+        return {
+          name,
+          price,
+          provider: "Uber (Live)",
+        };
+      }).filter(f => f.price > 50);
     });
 
     await browser.close();
     return fares;
-  } catch (err) {
-    console.error("Uber scraping failed:", err);
+  } catch (err: any) {
+    console.error("Uber scraping failed:", err.message);
     return null;
   }
 }
@@ -99,13 +109,12 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Missing location data" }, { status: 400 });
     }
 
-    // === Your existing routing logic (Google Maps + OSRM + fallback) ===
-    // (I kept a simplified version — replace this section with your full routing code if it's different)
-    let distanceMeters = 5000;   // placeholder
-    let durationSeconds = 900;   // placeholder
+    // === Distance & Duration Calculation ===
+    // TODO: Replace this placeholder with your original OSRM / Google Maps routing code
+    let distanceMeters = 8000;   // Default fallback (8 km)
+    let durationSeconds = 1200;  // Default fallback (20 minutes)
 
-    // TODO: Paste your full Google Maps / OSRM routing code here to calculate real distance & duration
-
+    // === Surge Multiplier ===
     const currentHour = new Date().getHours();
     let surgeMultiplier = 1.0;
     if ((currentHour >= 8 && currentHour <= 11) || (currentHour >= 17 && currentHour <= 21)) {
@@ -130,32 +139,50 @@ export async function POST(request: Request) {
         category: "Eco Cab",
         price: item.price,
         durationMinutes: Math.round(durationSeconds / 60),
-        etaMinutes: 4,
-        deeplink: `https://m.uber.com/looking?pickup[latitude]=${pickup_lat}&pickup[longitude]=${pickup_lng}`,
+        etaMinutes: 5,
+        deeplink: "#",
         discountApplied: null,
       }));
     } else {
       // Fallback to your original estimates
       uberPricing = [
-        { id: "uber-1", name: "Uber Auto", provider: "Uber", category: "Auto", price: calculateCalibratedFare("Auto", distanceMeters, durationSeconds, surgeMultiplier), durationMinutes: Math.round(durationSeconds/60), etaMinutes: 5, deeplink: "#" },
-        { id: "uber-2", name: "Uber Eco", provider: "Uber", category: "EcoCab", price: calculateCalibratedFare("EcoCab", distanceMeters, durationSeconds, surgeMultiplier), durationMinutes: Math.round(durationSeconds/60), etaMinutes: 6, deeplink: "#" },
-        { id: "uber-3", name: "Uber Sedan", provider: "Uber", category: "PremiumSedan", price: calculateCalibratedFare("PremiumSedan", distanceMeters, durationSeconds, surgeMultiplier), durationMinutes: Math.round(durationSeconds/60), etaMinutes: 7, deeplink: "#" },
+        { 
+          id: "uber-1", 
+          name: "Uber Auto", 
+          provider: "Uber", 
+          category: "Auto", 
+          price: calculateCalibratedFare("Auto", distanceMeters, durationSeconds, surgeMultiplier), 
+          durationMinutes: Math.round(durationSeconds/60), 
+          etaMinutes: 5, 
+          deeplink: "#" 
+        },
+        { 
+          id: "uber-2", 
+          name: "Uber Eco", 
+          provider: "Uber", 
+          category: "EcoCab", 
+          price: calculateCalibratedFare("EcoCab", distanceMeters, durationSeconds, surgeMultiplier), 
+          durationMinutes: Math.round(durationSeconds/60), 
+          etaMinutes: 6, 
+          deeplink: "#" 
+        },
+        { 
+          id: "uber-3", 
+          name: "Uber Sedan", 
+          provider: "Uber", 
+          category: "PremiumSedan", 
+          price: calculateCalibratedFare("PremiumSedan", distanceMeters, durationSeconds, surgeMultiplier), 
+          durationMinutes: Math.round(durationSeconds/60), 
+          etaMinutes: 7, 
+          deeplink: "#" 
+        },
       ];
     }
 
-    // === Keep your Ola, Rapido, ONDC sections as they are ===
-    // For now, using same fallback logic. You can add scraping for them later.
+    // === Other Providers (Add your Ola, Rapido, ONDC here) ===
+    const otherPricing: any[] = [];
 
-    const olaPricing = [ /* your existing Ola items */ ];
-    const rapidoPricing = [ /* your existing Rapido items */ ];
-    const ondcPricing = [ /* your existing ONDC items */ ];
-
-    const allFares = [...uberPricing, ...olaPricing, ...rapidoPricing, ...ondcPricing];
-
-    // Simple grouping (you can improve this)
-    const groupedFares = {
-      "Ride Sharing": allFares,
-    };
+    const allFares = [...uberPricing, ...otherPricing];
 
     return NextResponse.json({
       metadata: {
@@ -163,8 +190,8 @@ export async function POST(request: Request) {
         duration: Math.round(durationSeconds / 60) + " min",
         timestamp: new Date().toISOString(),
       },
-      fares: groupedFares,
-      note: scrapedUber ? "Uber shows LIVE prices (scraped)" : "Showing estimated prices",
+      fares: { "Ride Sharing": allFares },
+      note: scrapedUber ? "Uber prices are LIVE (scraped)" : "Showing estimated prices",
     });
 
   } catch (error: any) {
