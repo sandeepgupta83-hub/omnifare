@@ -11,7 +11,7 @@ export async function POST(request: Request) {
           name: "Uber Bike",
           provider: "Uber",
           category: "Bike",
-          price: 95,
+          price: 110,           // Adjusted
           durationMinutes: 20,
           etaMinutes: 5,
           deeplink: "#",
@@ -24,14 +24,14 @@ export async function POST(request: Request) {
           name: "Uber Auto",
           provider: "Uber",
           category: "Auto",
-          price: 175,        // Adjusted closer to real
+          price: 195,           // Adjusted closer to real
           durationMinutes: 23,
           etaMinutes: 6,
           deeplink: "#",
           discountApplied: null
         }
       ],
-      "EcoCab": [   // This shows for "Mini"
+      "EcoCab": [
         {
           id: "uber-mini-1",
           name: "Uber Mini / Eco",
@@ -44,7 +44,7 @@ export async function POST(request: Request) {
           discountApplied: null
         }
       ],
-      "PremiumSedan": [   // This shows for "Sedan"
+      "PremiumSedan": [
         {
           id: "uber-sedan-1",
           name: "Uber Sedan",
@@ -57,7 +57,7 @@ export async function POST(request: Request) {
           discountApplied: null
         }
       ],
-      "Prime": [   // Added for "Prime"
+      "Prime": [
         {
           id: "uber-prime-1",
           name: "Uber Prime",
@@ -79,7 +79,7 @@ export async function POST(request: Request) {
         timestamp: new Date().toISOString()
       },
       fares: faresData,
-      note: "Showing estimated prices (Live scraping paused due to Uber changes)"
+      note: "Showing estimated prices (Live scraping paused)"
     });
 
   } catch (error) {
