@@ -9,14 +9,16 @@
     "lint": "eslint"
   },
   "dependencies": {
-    "@supabase/supabase-js": "^2.106.0",
-    "framer-motion": "^12.39.0",
-    "leaflet": "^1.9.4",
-    "lucide-react": "^1.16.0",
-    "next": "16.2.6",
-    "react": "19.2.4",
-    "react-dom": "19.2.4"
-  },
+  "@sparticuz/chromium-min": "^133.0.0",
+  "@supabase/supabase-js": "^2.106.0",
+  "framer-motion": "^12.39.0",
+  "leaflet": "^1.9.4",
+  "lucide-react": "^1.16.0",
+  "next": "16.2.6",
+  "puppeteer-core": "^23.11.1",
+  "react": "19.2.4",
+  "react-dom": "19.2.4"
+},
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
     "@types/leaflet": "^1.9.21",
