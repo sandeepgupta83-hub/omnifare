@@ -3,9 +3,7 @@ import { NextResponse } from "next/server";
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    const { pickup_address, drop_address } = body || {};
 
-    // Hardcoded realistic fares matching what frontend expects
     const faresData = {
       "Auto": [
         {
@@ -13,7 +11,7 @@ export async function POST(request: Request) {
           name: "Uber Auto",
           provider: "Uber",
           category: "Auto",
-          price: 145,
+          price: 185,           // Improved
           durationMinutes: 22,
           etaMinutes: 6,
           deeplink: "#",
@@ -23,7 +21,7 @@ export async function POST(request: Request) {
       "EcoCab": [
         {
           id: "uber-eco-1",
-          name: "Uber Eco",
+          name: "Uber Eco / Mini",
           provider: "Uber",
           category: "EcoCab",
           price: 265,
@@ -39,7 +37,7 @@ export async function POST(request: Request) {
           name: "Uber Sedan",
           provider: "Uber",
           category: "PremiumSedan",
-          price: 395,
+          price: 420,
           durationMinutes: 22,
           etaMinutes: 8,
           deeplink: "#",
@@ -55,7 +53,7 @@ export async function POST(request: Request) {
         timestamp: new Date().toISOString()
       },
       fares: faresData,
-      note: "Showing estimated prices (Live scraping temporarily paused)"
+      note: "Showing estimated prices • Live scraping paused"
     });
 
   } catch (error) {
