@@ -3,38 +3,37 @@ import { NextResponse } from "next/server";
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    const { pickup_address, drop_address } = body || {};
-
-    // Always return visible results
+    
+    // Hardcoded working data so you can see results immediately
     const allFares = [
       { 
-        id: "uber-auto", 
+        id: "1", 
         name: "Uber Auto", 
         provider: "Uber", 
         category: "Auto", 
-        price: 135, 
-        durationMinutes: 22, 
-        etaMinutes: 5, 
-        deeplink: "#" 
-      },
-      { 
-        id: "uber-eco", 
-        name: "Uber Eco", 
-        provider: "Uber (Live Attempt)", 
-        category: "EcoCab", 
-        price: 255, 
+        price: 145, 
         durationMinutes: 22, 
         etaMinutes: 6, 
         deeplink: "#" 
       },
       { 
-        id: "uber-sedan", 
+        id: "2", 
+        name: "Uber Eco", 
+        provider: "Uber", 
+        category: "EcoCab", 
+        price: 265, 
+        durationMinutes: 22, 
+        etaMinutes: 7, 
+        deeplink: "#" 
+      },
+      { 
+        id: "3", 
         name: "Uber Sedan", 
         provider: "Uber", 
         category: "PremiumSedan", 
-        price: 385, 
+        price: 395, 
         durationMinutes: 22, 
-        etaMinutes: 7, 
+        etaMinutes: 8, 
         deeplink: "#" 
       },
     ];
@@ -45,8 +44,10 @@ export async function POST(request: Request) {
         duration: "22 min", 
         timestamp: new Date().toISOString() 
       },
-      fares: { "Ride Sharing": allFares },
-      note: "Uber live scraping currently unavailable (site changed). Showing estimates.",
+      fares: { 
+        "Ride Sharing": allFares 
+      },
+      note: "Showing estimated prices (Live scraping paused due to Uber website changes)"
     });
 
   } catch (error) {
